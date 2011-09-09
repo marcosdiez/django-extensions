@@ -268,7 +268,7 @@ class InstanceCode(Code):
             cls = self.instance.__class__
             using = router.db_for_write(cls, instance=self.instance)
             collector = Collector(using=using)
-            collector.collect([self.instance])
+            collector.collect([self.instance], collect_related=False)
 
             # collector stores its instances in two places. I *think* we
             # only need collector.data, but using the batches is needed
