@@ -2,6 +2,7 @@
 
 VERSION = (0, 14, "pre")
 
+
 # Dynamically calculate the version based on VERSION tuple
 if len(VERSION) > 2 and VERSION[2] is not None:
     if isinstance(VERSION[2], int):
