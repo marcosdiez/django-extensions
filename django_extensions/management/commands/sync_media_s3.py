@@ -21,16 +21,14 @@ AWS_BUCKET_NAME = ''
 Command options are:
   -p PREFIX, --prefix=PREFIX
                         The prefix to prepend to the path on S3.
-  --gzip                Enables gzipping CSS and Javascript files.
+  --gzip                Enables gzipping CSS and Javascript files. The files will be renamed
+                        by appending the original name with .gz
+                        and only the gzipped versions will be uploaded. 
   --expires             Enables setting a far future expires header.
   --force               Skip the file mtime check to force upload of all
                         files.
   --filter-list         Override default directory and file exclusion
                         filters. (enter as comma seperated line)
-  --renamegzip          Enables renaming of gzipped files by appending '.gz.
-                        to the original file name. This way your original assets
-                        will not be replaced by the gzipped ones if you don't want
-                        them to be. 
 
 TODO:
  * Use fnmatch (or regex) to allow more complex FILTER_LIST rules.
@@ -83,9 +81,6 @@ class Command(BaseCommand):
         optparse.make_option('--gzip',
             action='store_true', dest='gzip', default=False,
             help="Enables gzipping CSS and Javascript files."),
-        optparse.make_option('--renamegzip',
-            action='store_true', dest='renamegzip', default=False,
-            help="Enables renaming of gzipped assets to have '.gz' appended to the filename."),
         optparse.make_option('--expires',
             action='store_true', dest='expires', default=False,
             help="Enables setting a far future expires header."),
@@ -130,7 +125,6 @@ class Command(BaseCommand):
         self.verbosity = int(options.get('verbosity'))
         self.prefix = options.get('prefix')
         self.do_gzip = options.get('gzip')
-        self.rename_gzip = options.get('renamegzip')
         self.do_expires = options.get('expires')
         self.do_force = options.get('force')
         self.DIRECTORY = options.get('dir')
@@ -212,19 +206,20 @@ class Command(BaseCommand):
                 file_key = '%s/%s' % (self.prefix, file_key)
 
             # Check if file on S3 is older than local file, if so, upload
-            if not self.do_force:
-                s3_key = bucket.get_key(file_key)
-                if s3_key:
-                    s3_datetime = datetime.datetime(*time.strptime(
-                        s3_key.last_modified, '%a, %d %b %Y %H:%M:%S %Z')[0:6])
-                    local_datetime = datetime.datetime.utcfromtimestamp(
-                        os.stat(filename).st_mtime)
-                    if local_datetime < s3_datetime:
-                        self.skip_count += 1
-                        if self.verbosity > 1:
-                            print "File %s hasn't been modified since last " \
-                                "being uploaded" % (file_key)
-                        continue
+            if not self.do_gzip:  #if we are gzipping, skip the has-file-been-modified check
+                if not self.do_force:
+                    s3_key = bucket.get_key(file_key)
+                    if s3_key:
+                        s3_datetime = datetime.datetime(*time.strptime(
+                            s3_key.last_modified, '%a, %d %b %Y %H:%M:%S %Z')[0:6])
+                        local_datetime = datetime.datetime.utcfromtimestamp(
+                            os.stat(filename).st_mtime)
+                        if local_datetime < s3_datetime:
+                            self.skip_count += 1
+                            if self.verbosity > 1:
+                                print "File %s hasn't been modified since last " \
+                                    "being uploaded" % (file_key)
+                            continue
 
             # File is newer, let's process and upload
             if self.verbosity > 0:
@@ -240,10 +235,9 @@ class Command(BaseCommand):
                 # Gzipping only if file is large enough (>1K is recommended)
                 # and only if file is a common text type (not a binary file)
                 if file_size > 1024 and content_type in self.GZIP_CONTENT_TYPES:
-                    filedata = self.compress_string(filedata)
-                    if self.rename_gzip: 
-                        #If rename_gzip is True, then rename the file by appending '.gz' to original filename
-                        file_key = '%s.gz' % (file_key)
+                    filedata = self.compress_string(filedata) 
+                    # rename the file by appending '.gz' to original filename
+                    file_key = '%s.gz' % (file_key)
                     headers['Content-Encoding'] = 'gzip'
                     if self.verbosity > 1:
                         print "\tgzipped: %dk to %dk" % \
