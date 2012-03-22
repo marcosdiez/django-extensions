@@ -206,20 +206,19 @@ class Command(BaseCommand):
                 file_key = '%s/%s' % (self.prefix, file_key)
 
             # Check if file on S3 is older than local file, if so, upload
-            if not self.do_gzip:  #if we are gzipping, skip the has-file-been-modified check
-                if not self.do_force:
-                    s3_key = bucket.get_key(file_key)
-                    if s3_key:
-                        s3_datetime = datetime.datetime(*time.strptime(
-                            s3_key.last_modified, '%a, %d %b %Y %H:%M:%S %Z')[0:6])
-                        local_datetime = datetime.datetime.utcfromtimestamp(
-                            os.stat(filename).st_mtime)
-                        if local_datetime < s3_datetime:
-                            self.skip_count += 1
-                            if self.verbosity > 1:
-                                print "File %s hasn't been modified since last " \
-                                    "being uploaded" % (file_key)
-                            continue
+            if not self.do_force:
+                s3_key = bucket.get_key(file_key)
+                if s3_key:
+                    s3_datetime = datetime.datetime(*time.strptime(
+                        s3_key.last_modified, '%a, %d %b %Y %H:%M:%S %Z')[0:6])
+                    local_datetime = datetime.datetime.utcfromtimestamp(
+                        os.stat(filename).st_mtime)
+                    if local_datetime < s3_datetime:
+                        self.skip_count += 1
+                        if self.verbosity > 1:
+                            print "File %s hasn't been modified since last " \
+                                "being uploaded" % (file_key)
+                        continue
 
             # File is newer, let's process and upload
             if self.verbosity > 0:
@@ -231,17 +230,18 @@ class Command(BaseCommand):
             file_obj = open(filename, 'rb')
             file_size = os.fstat(file_obj.fileno()).st_size
             filedata = file_obj.read()
+
             if self.do_gzip:
                 # Gzipping only if file is large enough (>1K is recommended)
                 # and only if file is a common text type (not a binary file)
                 if file_size > 1024 and content_type in self.GZIP_CONTENT_TYPES:
-                    filedata = self.compress_string(filedata) 
+                    gzipped_filedata = self.compress_string(filedata) 
                     # rename the file by appending '.gz' to original filename
-                    file_key = '%s.gz' % (file_key)
-                    headers['Content-Encoding'] = 'gzip'
-                    if self.verbosity > 1:
-                        print "\tgzipped: %dk to %dk" % \
-                            (file_size / 1024, len(filedata) / 1024)
+                    gzipped_file_key = '%s.gz' % (file_key)
+                else:
+                    gzipped_filedata = None
+                    gzipped_file_key = None
+                    
             if self.do_expires:
                 # HTTP/1.0
                 headers['Expires'] = '%s GMT' % (email.Utils.formatdate(
@@ -257,6 +257,17 @@ class Command(BaseCommand):
                 key.name = file_key
                 key.set_contents_from_string(filedata, headers, replace=True)
                 key.set_acl('public-read')
+                
+                if self.do_gzip and gzipped_filedata:
+                    headers['Content-Encoding'] = 'gzip'
+                    if self.verbosity > 1:
+                        print "\tgzipped: %dk to %dk" % \
+                            (file_size / 1024, len(gzipped_filedata) / 1024)
+                    key.name = gzipped_file_key
+                    key.set_contents_from_string(gzipped_filedata, headers, replace=True)
+                    key.set_acl('public-read')
+                    
+                
             except boto.exception.S3CreateError, e:
                 print "Failed: %s" % e
             except Exception, e:
