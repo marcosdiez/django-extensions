@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """
 Sync Media to S3
 ================
@@ -23,7 +25,7 @@ Command options are:
                         The prefix to prepend to the path on S3.
   --gzip                Enables gzipping CSS and Javascript files. The files will be renamed
                         by appending the original name with .gz
-                        and only the gzipped versions will be uploaded. 
+                        and only the gzipped versions will be uploaded.
   --expires             Enables setting a far future expires header.
   --force               Skip the file mtime check to force upload of all
                         files.
@@ -236,14 +238,15 @@ class Command(BaseCommand):
                 # Gzipping only if file is large enough (>1K is recommended)
                 # and only if file is a common text type (not a binary file)
                 if file_size > 1024 and content_type in self.GZIP_CONTENT_TYPES:
-                    gzipped_filedata = self.compress_string(filedata) 
+                    gzipped_filedata = self.compress_string(filedata)
                     # rename the file by appending '.jgz' to original filename
                     # Older versions of Safari have issues with '.gz'
                     gzipped_file_key = '%s.jgz' % (file_key)
+
                 else:
                     gzipped_filedata = None
                     gzipped_file_key = None
-                    
+
             if self.do_expires:
                 # HTTP/1.0
                 expire_date = datetime.datetime.now() + datetime.timedelta(days=365 * 2)
@@ -258,7 +261,7 @@ class Command(BaseCommand):
                 key.name = file_key
                 key.set_contents_from_string(filedata, headers, replace=True)
                 key.set_acl('public-read')
-                
+
                 if self.do_gzip and gzipped_filedata:
                     headers['Content-Encoding'] = 'gzip'
                     if self.verbosity > 1:
@@ -267,8 +270,8 @@ class Command(BaseCommand):
                     key.name = gzipped_file_key
                     key.set_contents_from_string(gzipped_filedata, headers, replace=True)
                     key.set_acl('public-read')
-                    
-                
+
+
             except boto.exception.S3CreateError, e:
                 print "Failed: %s" % e
             except Exception, e:
