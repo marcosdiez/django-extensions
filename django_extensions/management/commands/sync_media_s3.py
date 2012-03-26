@@ -236,8 +236,9 @@ class Command(BaseCommand):
                 # and only if file is a common text type (not a binary file)
                 if file_size > 1024 and content_type in self.GZIP_CONTENT_TYPES:
                     gzipped_filedata = self.compress_string(filedata) 
-                    # rename the file by appending '.gz' to original filename
-                    gzipped_file_key = '%s.gz' % (file_key)
+                    # rename the file by appending '.jgz' to original filename
+                    # Older versions of Safari have issues with '.gz'
+                    gzipped_file_key = '%s.jgz' % (file_key)
                 else:
                     gzipped_filedata = None
                     gzipped_file_key = None
