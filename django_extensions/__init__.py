@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+
 VERSION = (0, 9, 1, "yipit-rev14")
 
 # Dynamically calculate the version based on VERSION tuple
