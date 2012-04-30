@@ -44,6 +44,7 @@ import time
 
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
+from django.utils.http import http_date
 
 # Make sure boto is available
 try:
@@ -245,11 +246,10 @@ class Command(BaseCommand):
                     
             if self.do_expires:
                 # HTTP/1.0
-                headers['Expires'] = '%s GMT' % (email.Utils.formatdate(
-                    time.mktime((datetime.datetime.now() +
-                    datetime.timedelta(days=365 * 2)).timetuple())))
+                expire_date = datetime.datetime.now() + datetime.timedelta(days=365 * 2)
+                headers['Expires'] = http_date(time.mktime(expire_date.timetuple()))
                 # HTTP/1.1
-                headers['Cache-Control'] = 'max-age %d' % (3600 * 24 * 365 * 2)
+                headers['Cache-Control'] = 'max-age=%d' % (3600 * 24 * 365 * 2)
                 if self.verbosity > 1:
                     print "\texpires: %s" % (headers['Expires'])
                     print "\tcache-control: %s" % (headers['Cache-Control'])
